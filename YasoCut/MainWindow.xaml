@@ -1,0 +1,34 @@
+﻿<Window x:Class="YasoCut.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:YasoCut"
+        mc:Ignorable="d"
+        x:Name="WindowTitle"
+        Title="YasoCut" Height="139" Width="457" ResizeMode="CanMinimize" WindowStyle="SingleBorderWindow" WindowStartupLocation="CenterScreen">
+    <Grid Margin="8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="auto"/>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="auto"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition/>
+            <RowDefinition/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="保存目录"/>
+        <TextBox x:Name="TextboxPath" IsReadOnly="True" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
+        <StackPanel VerticalAlignment="Center" Orientation="Horizontal" Grid.Row="0" Grid.Column="2" >
+            <Button Click="ButtonSelect_Click" x:Name="ButtonSelect"  Content="选择目录"  VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <Button Click="ButtonOpen_Click" x:Name="ButtonOpen" IsEnabled="True" Content="打开目录"  VerticalAlignment="Center" Margin="4,0,0,0"/>
+        </StackPanel>
+        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="文件前缀"/>
+        <TextBox TextChanged="TextboxPrefix_TextChanged" x:Name="TextboxPrefix" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
+        <CheckBox Checked="CheckBoxTitle_Checked" Unchecked="CheckBoxTitle_Checked" x:Name="CheckBoxTitle"  IsChecked="True" Grid.Row="1" Grid.Column="2" Content="截图包含非工作区" VerticalAlignment="Center"/>
+        <TextBlock  Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="快捷按键"/>
+        <TextBox IsEnabled="False" PreviewKeyDown="TextboxShotcut_PreviewKeyDown" x:Name="TextboxShotcut" IsReadOnly="True" Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
+        <Button Click="ButtonShotcut_Click" x:Name="ButtonShotcut" Content="设置快捷键" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center"/>
+    </Grid>
+</Window>
