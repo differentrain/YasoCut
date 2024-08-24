@@ -59,6 +59,7 @@ namespace YasoCut
         private System.Windows.Forms.ToolStripMenuItem _checkClickTipOpenFolderMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkClickTipOpenFileMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkRemoveAeroMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _checkNotSaveMenuItem;
         private bool _notExit = true;
         private string _lastImgFile;
 
@@ -192,6 +193,14 @@ namespace YasoCut
             };
             cms.Items.Add(separatorMenuItem0);
 
+            _checkNotSaveMenuItem = new System.Windows.Forms.ToolStripMenuItem
+            {
+                Text = "不保存到文件",
+                CheckOnClick = true,
+            };
+            _checkNotSaveMenuItem.Click += CheckNotSaveMenuItem_Click;
+            cms.Items.Add(_checkNotSaveMenuItem);
+
 
             _menuFormatMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             _comboFormatMenuItem = new System.Windows.Forms.ToolStripComboBox
@@ -221,6 +230,16 @@ namespace YasoCut
 
             cms.Items.Add(exitMenuItem);
 
+        }
+
+        private void CheckNotSaveMenuItem_Click(object sender, EventArgs e)
+        {
+            using (RegistryKey soft = Registry.CurrentUser.OpenSubKey("SOFTWARE", true))
+            {
+                RegistryKey yasocut = soft.OpenSubKey("YasoCut", true) ?? soft.CreateSubKey("YasoCut", true);
+                yasocut.SetValue("NotSave", _checkNotSaveMenuItem.Checked ? 1 : 0, RegistryValueKind.DWord);
+                yasocut.Dispose();
+            }
         }
 
         private void CheckRemoveAeroMenuItem_Click(object sender, EventArgs e)
@@ -464,32 +483,33 @@ namespace YasoCut
         {
             using (Bitmap bmp = new Bitmap(bounds.Width, bounds.Height))
             {
-                // Draw the screenshot into our bitmap.
                 using (Graphics g = Graphics.FromImage(bmp))
                 {
                     g.CopyFromScreen(new System.Drawing.Point(bounds.Left, bounds.Top), System.Drawing.Point.Empty, bounds.Size);
                 }
-                // Do something with the Bitmap here, like save it to a file:
-
                 var format = (ImageFormatType)_comboFormatMenuItem.SelectedIndex;
-                _lastImgFile = $"{TextboxPath.Text}\\{TextboxPrefix.Text}{DateTime.Now:yyyyMMddHHmmssfff}.{format.GetImageExtensionName()}";
-                if (_checkCopyMenuItem.Checked)
+                if (_checkNotSaveMenuItem.Checked || _checkCopyMenuItem.Checked)
                 {
                     System.Windows.Forms.Clipboard.SetImage(bmp);
                 }
-                try
+                if (!_checkNotSaveMenuItem.Checked)
                 {
-                    bmp.Save(_lastImgFile, format.GetImageFormat());
-                    if (_checkShowTipMenuItem.Checked)
+                    _lastImgFile = $"{TextboxPath.Text}\\{TextboxPrefix.Text}{DateTime.Now:yyyyMMddHHmmssfff}.{format.GetImageExtensionName()}";
+                    try
                     {
-                        this._notifyIcon.ShowBalloonTip(1000, $"截图成功!\n{_lastImgFile}", "YasoCut", System.Windows.Forms.ToolTipIcon.Info);
+                        bmp.Save(_lastImgFile, format.GetImageFormat());
+                        if (_checkShowTipMenuItem.Checked)
+                        {
+                            this._notifyIcon.ShowBalloonTip(1000, $"截图成功!\n{_lastImgFile}", "YasoCut", System.Windows.Forms.ToolTipIcon.Info);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _lastImgFile = null;
+                        this._notifyIcon.ShowBalloonTip(1000, $"截图失败!\n{ex}", "YasoCut", System.Windows.Forms.ToolTipIcon.Info);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _lastImgFile = null;
-                    this._notifyIcon.ShowBalloonTip(1000, $"截图失败!\n{ex}", "YasoCut", System.Windows.Forms.ToolTipIcon.Info);
-                }
+               
             }
         }
 
@@ -601,6 +621,7 @@ namespace YasoCut
                     yasocut.SetValue("Path", path, RegistryValueKind.String);
                 }
                 TextboxPath.Text = path;
+
                 if (!(yasocut.GetValue("Prefix") is string prefix))
                 {
                     prefix = string.Empty;
@@ -651,6 +672,13 @@ namespace YasoCut
                 }
                 _checkShowTipMenuItem.Checked = showTip != 0;
 
+                if (!(yasocut.GetValue("NotSave") is int notSave))
+                {
+                    notSave = 0;
+                    yasocut.SetValue("NotSave", notSave, RegistryValueKind.DWord);
+                }
+                _checkNotSaveMenuItem.Checked = notSave != 0;
+
                 if (!(yasocut.GetValue("ClickTipAction") is int clickTipAction))
                 {
                     clickTipAction = 0;
@@ -679,7 +707,6 @@ namespace YasoCut
                 }
                 _comboFormatMenuItem.SelectedIndex = format;
                 _menuFormatMenuItem.Text = $"图片格式: {(ImageFormatType)_comboFormatMenuItem.SelectedIndex}";
-
 
                 if (!(yasocut.GetValue("Shortcut") is long shortcut) || shortcut == 0)
                 {
