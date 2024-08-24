@@ -436,6 +436,14 @@ namespace YasoCut
             NativeMethods.SHQueryUserNotificationState(out int winStyle);
             int ncrp = 0;
             bool needRestNcrp = false;
+            if (!NativeMethods.GetWindowDisplayAffinity(handle, out int affState))
+            {
+                affState = 0;
+            }
+            else if (affState != 0)
+            {
+                NativeMethods.SetWindowDisplayAffinity(handle, 0);
+            }
             if (winStyle != 2 && winStyle != 3)
             {
                 if (_checkRemoveAeroMenuItem.Checked &&
@@ -474,7 +482,10 @@ namespace YasoCut
                 ncrp = NCRP_ENABLED;
                 NativeMethods.DwmSetWindowAttribute(handle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4);
             }
-
+            if (affState != 0)
+            {
+                NativeMethods.SetWindowDisplayAffinity(handle, affState);
+            }
 
             return IntPtr.Zero;
         }
@@ -509,7 +520,7 @@ namespace YasoCut
                         this._notifyIcon.ShowBalloonTip(1000, $"截图失败!\n{ex}", "YasoCut", System.Windows.Forms.ToolTipIcon.Info);
                     }
                 }
-               
+
             }
         }
 

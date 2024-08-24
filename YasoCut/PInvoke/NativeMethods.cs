@@ -41,5 +41,11 @@ namespace YasoCut.PInvoke
         [DllImport("Dwmapi.dll", CallingConvention = CallingConvention.Winapi, EntryPoint = "DwmSetWindowAttribute", ExactSpelling = true)]
         public static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int dwMNCRP, int cbAttribute);
 
+        [DllImport("User32.dll", CallingConvention = CallingConvention.Winapi, EntryPoint = "GetWindowDisplayAffinity", ExactSpelling = true)]
+        public static extern bool GetWindowDisplayAffinity(IntPtr hwnd, out int pdwAffinity);
+
+        [DllImport("User32.dll", CallingConvention = CallingConvention.Winapi, EntryPoint = "SetWindowDisplayAffinity", ExactSpelling = true)]
+        public static extern bool SetWindowDisplayAffinity(IntPtr hwnd, int pdwAffinity);
+
     }
 }
