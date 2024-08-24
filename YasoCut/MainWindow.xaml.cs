@@ -60,6 +60,7 @@ namespace YasoCut
         private System.Windows.Forms.ToolStripMenuItem _checkClickTipOpenFileMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkRemoveAeroMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkNotSaveMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _checkTryProtectMenuItem;
         private bool _notExit = true;
         private string _lastImgFile;
 
@@ -137,6 +138,14 @@ namespace YasoCut
             };
             _checkCutFullMenuItem.Click += CheckCutFullMenuItem_Click;
             cms.Items.Add(_checkCutFullMenuItem);
+
+            _checkTryProtectMenuItem = new System.Windows.Forms.ToolStripMenuItem
+            {
+                Text = "尝试截取受保护的窗口",
+                CheckOnClick = true,
+            };
+            _checkTryProtectMenuItem.Click += CheckTryProtectMenuItem_Click;
+            cms.Items.Add(_checkTryProtectMenuItem);
 
 
             _checkRemoveAeroMenuItem = new System.Windows.Forms.ToolStripMenuItem
@@ -230,6 +239,16 @@ namespace YasoCut
 
             cms.Items.Add(exitMenuItem);
 
+        }
+
+        private void CheckTryProtectMenuItem_Click(object sender, EventArgs e)
+        {
+            using (RegistryKey soft = Registry.CurrentUser.OpenSubKey("SOFTWARE", true))
+            {
+                RegistryKey yasocut = soft.OpenSubKey("YasoCut", true) ?? soft.CreateSubKey("YasoCut", true);
+                yasocut.SetValue("TryProtect", _checkTryProtectMenuItem.Checked ? 1 : 0, RegistryValueKind.DWord);
+                yasocut.Dispose();
+            }
         }
 
         private void CheckNotSaveMenuItem_Click(object sender, EventArgs e)
@@ -436,7 +455,12 @@ namespace YasoCut
             NativeMethods.SHQueryUserNotificationState(out int winStyle);
             int ncrp = 0;
             bool needRestNcrp = false;
-            if (!NativeMethods.GetWindowDisplayAffinity(handle, out int affState))
+            int affState;
+            if (!_checkTryProtectMenuItem.Checked)
+            {
+                affState = 0;
+            }
+            else if (!NativeMethods.GetWindowDisplayAffinity(handle, out affState))
             {
                 affState = 0;
             }
@@ -647,6 +671,12 @@ namespace YasoCut
                 }
                 CheckBoxTitle.IsChecked = includeTitle != 0;
 
+                if (!(yasocut.GetValue("TryProtect") is int tryProtect))
+                {
+                    tryProtect = 0;
+                    yasocut.SetValue("TryProtect", tryProtect, RegistryValueKind.DWord);
+                }
+                _checkTryProtectMenuItem.Checked = tryProtect != 0;
 
                 if (!(yasocut.GetValue("ExitToTray") is int notClose))
                 {
