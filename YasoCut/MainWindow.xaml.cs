@@ -209,6 +209,7 @@ namespace YasoCut
                 Text = "连续模式",
                 CheckOnClick = true,
             };
+            _checkComMsMenuItem.Click += CheckComMsMenuItem_Click;
             cms.Items.Add(_checkComMsMenuItem);
 
             var separatorMenuItem4 = new System.Windows.Forms.ToolStripSeparator
@@ -254,6 +255,11 @@ namespace YasoCut
 
             cms.Items.Add(exitMenuItem);
 
+        }
+
+        private void CheckComMsMenuItem_Click(object sender, EventArgs e)
+        {
+            TextboxMs.IsEnabled = _checkComMsMenuItem.Checked;
         }
 
         private void CheckTryProtectMenuItem_Click(object sender, EventArgs e)
@@ -440,7 +446,7 @@ namespace YasoCut
                     _notifyIcon.Dispose();
                 }
 
-                if (!_isRunning)
+                if (_isRunning)
                 {
                     _isRunning = false;
                     while (_backThread.IsAlive)

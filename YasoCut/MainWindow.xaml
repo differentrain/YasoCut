@@ -33,7 +33,7 @@
         <TextBox IsEnabled="False" PreviewKeyDown="TextboxShotcut_PreviewKeyDown" x:Name="TextboxShotcut" IsReadOnly="True" Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
         <Button Click="ButtonShotcut_Click" x:Name="ButtonShotcut" Content="设置快捷键" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center"/>
         <TextBlock  Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="连续模式间隔"/>
-        <TextBox TextChanged="TextboxMs_TextChanged" PreviewKeyDown="TextboxMs_PreviewKeyDown" x:Name="TextboxMs" Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
+        <TextBox IsEnabled="False" TextChanged="TextboxMs_TextChanged" PreviewKeyDown="TextboxMs_PreviewKeyDown" x:Name="TextboxMs" Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
         <TextBlock Grid.Row="3" Grid.Column="2" VerticalAlignment="Center" Text="毫秒（1000毫秒=1秒）"/>
     </Grid>
 </Window>
