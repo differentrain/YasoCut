@@ -274,6 +274,11 @@ namespace YasoCut
 
         private void CheckNotSaveMenuItem_Click(object sender, EventArgs e)
         {
+            TextboxPrefix.IsEnabled = !_checkNotSaveMenuItem.Checked;
+            TextboxPath.IsEnabled = !_checkNotSaveMenuItem.Checked;
+            ButtonOpen.IsEnabled = !_checkNotSaveMenuItem.Checked;
+            ButtonSelect.IsEnabled = !_checkNotSaveMenuItem.Checked;
+            _menuFormatMenuItem.Enabled = !_checkNotSaveMenuItem.Checked;
             using (RegistryKey soft = Registry.CurrentUser.OpenSubKey("SOFTWARE", true))
             {
                 RegistryKey yasocut = soft.OpenSubKey("YasoCut", true) ?? soft.CreateSubKey("YasoCut", true);
@@ -590,7 +595,7 @@ namespace YasoCut
                     NativeMethods.GetWindowRect(lastHandle, ref rect);
                     bounds = rect.ToRectangle();
                 }
-                SaveImage(bounds, prefix, folder);
+                SaveImage(bounds, prefix, folder, true);
                 lastTick = sw.ElapsedMilliseconds - lastTick;
                 if (lastTick < con)
                 {
@@ -707,7 +712,7 @@ namespace YasoCut
                     bounds = rect.ToRectangle();
                 }
 
-                SaveImage(bounds, TextboxPrefix.Text, TextboxPath.Text);
+                SaveImage(bounds, TextboxPrefix.Text, TextboxPath.Text, false);
                 if (needRestNcrp)
                 {
                     ncrp = NCRP_ENABLED;
@@ -722,7 +727,7 @@ namespace YasoCut
             return IntPtr.Zero;
         }
 
-        private void SaveImage(in Rectangle bounds, string prefix, string folder)
+        private void SaveImage(in Rectangle bounds, string prefix, string folder, bool isCom)
         {
             bool notSave = _checkNotSaveMenuItem.Checked;
             Bitmap bmp = null;
@@ -750,7 +755,7 @@ namespace YasoCut
 
             var format = (ImageFormatType)_comboFormatMenuItem.SelectedIndex;
 
-            if (notSave || _checkCopyMenuItem.Checked)
+            if (!isCom && (notSave || _checkCopyMenuItem.Checked))
             {
                 try
                 {
@@ -762,7 +767,7 @@ namespace YasoCut
                 }
             }
 
-            if (!notSave)
+            if (isCom || !notSave)
             {
                 var fileName = $"{prefix}{DateTime.Now:yyyyMMddHHmmssfff}.{format.GetImageExtensionName()}";
                 _lastImgFile = $"{folder}\\{fileName}";
@@ -798,13 +803,13 @@ namespace YasoCut
                     WindowTitle.Title = "YasoCut - 快捷键无效";
                     return;
                 }
-                TextboxMs.IsEnabled = true;
+                TextboxMs.IsEnabled = _checkComMsMenuItem.Checked;
                 _isSettingShortCut = false;
                 TextboxShotcut.IsEnabled = false;
-                TextboxPrefix.IsEnabled = true;
-                TextboxPath.IsEnabled = true;
-                ButtonOpen.IsEnabled = true;
-                ButtonSelect.IsEnabled = true;
+                TextboxPrefix.IsEnabled = !_checkNotSaveMenuItem.Checked;
+                TextboxPath.IsEnabled = !_checkNotSaveMenuItem.Checked;
+                ButtonOpen.IsEnabled = !_checkNotSaveMenuItem.Checked;
+                ButtonSelect.IsEnabled = !_checkNotSaveMenuItem.Checked;
                 CheckBoxTitle.IsEnabled = true;
                 ButtonShotcut.Content = "设置快捷键";
                 WindowTitle.Title = "YasoCut";
@@ -1020,6 +1025,11 @@ namespace YasoCut
                 }
                 yasocut.Dispose();
             }
+            TextboxPrefix.IsEnabled = !_checkNotSaveMenuItem.Checked;
+            TextboxPath.IsEnabled = !_checkNotSaveMenuItem.Checked;
+            ButtonOpen.IsEnabled = !_checkNotSaveMenuItem.Checked;
+            ButtonSelect.IsEnabled = !_checkNotSaveMenuItem.Checked;
+            _menuFormatMenuItem.Enabled = !_checkNotSaveMenuItem.Checked;
             _inited = true;
         }
 
