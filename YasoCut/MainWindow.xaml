@@ -6,8 +6,8 @@
         xmlns:local="clr-namespace:YasoCut"
         mc:Ignorable="d"
         x:Name="WindowTitle"
-        Title="YasoCut" Height="139" Width="457" ResizeMode="CanMinimize" WindowStyle="SingleBorderWindow" WindowStartupLocation="CenterScreen">
-    <Grid Margin="8">
+        Title="YasoCut" Height="166" Width="522" ResizeMode="CanMinimize" WindowStyle="SingleBorderWindow" WindowStartupLocation="CenterScreen">
+    <Grid x:Name="GridMain" Margin="8">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="auto"/>
             <ColumnDefinition/>
@@ -17,18 +17,23 @@
             <RowDefinition/>
             <RowDefinition/>
             <RowDefinition/>
+            <RowDefinition/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="保存目录"/>
         <TextBox x:Name="TextboxPath" IsReadOnly="True" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
-        <StackPanel VerticalAlignment="Center" Orientation="Horizontal" Grid.Row="0" Grid.Column="2" >
-            <Button Click="ButtonSelect_Click" x:Name="ButtonSelect"  Content="选择目录"  VerticalAlignment="Center" Margin="0,0,4,0"/>
-            <Button Click="ButtonOpen_Click" x:Name="ButtonOpen" IsEnabled="True" Content="打开目录"  VerticalAlignment="Center" Margin="4,0,0,0"/>
-        </StackPanel>
+        <DockPanel VerticalAlignment="Center" Grid.Row="0" Grid.Column="2" >
+            <Button DockPanel.Dock="Left" Click="ButtonSelect_Click" x:Name="ButtonSelect"  Content="选择目录"  VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Right"  Click="ButtonOpen_Click" x:Name="ButtonOpen" IsEnabled="True" Content="打开目录"  VerticalAlignment="Center"/>
+            <TextBlock/>
+        </DockPanel>
         <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="文件前缀"/>
         <TextBox TextChanged="TextboxPrefix_TextChanged" x:Name="TextboxPrefix" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
         <CheckBox Checked="CheckBoxTitle_Checked" Unchecked="CheckBoxTitle_Checked" x:Name="CheckBoxTitle"  IsChecked="True" Grid.Row="1" Grid.Column="2" Content="截图包含非工作区" VerticalAlignment="Center"/>
         <TextBlock  Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="快捷按键"/>
         <TextBox IsEnabled="False" PreviewKeyDown="TextboxShotcut_PreviewKeyDown" x:Name="TextboxShotcut" IsReadOnly="True" Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
         <Button Click="ButtonShotcut_Click" x:Name="ButtonShotcut" Content="设置快捷键" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center"/>
+        <TextBlock  Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="连续模式间隔"/>
+        <TextBox TextChanged="TextboxMs_TextChanged" PreviewKeyDown="TextboxMs_PreviewKeyDown" x:Name="TextboxMs" Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
+        <TextBlock Grid.Row="3" Grid.Column="2" VerticalAlignment="Center" Text="毫秒（1000毫秒=1秒）"/>
     </Grid>
 </Window>

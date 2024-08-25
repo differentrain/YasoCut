@@ -9,6 +9,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -61,9 +62,10 @@ namespace YasoCut
         private System.Windows.Forms.ToolStripMenuItem _checkRemoveAeroMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkNotSaveMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkTryProtectMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _checkComMsMenuItem;
         private bool _notExit = true;
         private string _lastImgFile;
-
+        private Thread _backThread;
         public Mutex MyMutex { get; }
 
         public MainWindow()
@@ -201,6 +203,19 @@ namespace YasoCut
                 Text = "-",
             };
             cms.Items.Add(separatorMenuItem0);
+
+            _checkComMsMenuItem = new System.Windows.Forms.ToolStripMenuItem
+            {
+                Text = "连续模式",
+                CheckOnClick = true,
+            };
+            cms.Items.Add(_checkComMsMenuItem);
+
+            var separatorMenuItem4 = new System.Windows.Forms.ToolStripSeparator
+            {
+                Text = "-",
+            };
+            cms.Items.Add(separatorMenuItem4);
 
             _checkNotSaveMenuItem = new System.Windows.Forms.ToolStripMenuItem
             {
@@ -424,6 +439,15 @@ namespace YasoCut
                     _notifyIcon.Visible = false;
                     _notifyIcon.Dispose();
                 }
+
+                if (!_isRunning)
+                {
+                    _isRunning = false;
+                    while (_backThread.IsAlive)
+                    {
+                        Thread.Sleep(1);
+                    }
+                }
             }
             base.OnClosing(e);
         }
@@ -441,6 +465,135 @@ namespace YasoCut
             ReadReg();
         }
 
+        private bool _isRunning = false;
+
+        private void BackWorkThread()
+        {
+            var sw = new Stopwatch();
+
+            IntPtr lastHandle = IntPtr.Zero;
+            NativeRect rect = new NativeRect();
+            NativeRect realRect = new NativeRect();
+            Rectangle bounds;
+            IntPtr handle;
+            bool isFullScreen = false;
+            int ncrp = 0;
+            bool needRestNcrp = false;
+            int affState = 0;
+            long lastTick;
+            long con;
+
+
+            bool workAreaAndTitle = false;
+            bool tryProtect = false;
+            bool cutFull = false;
+            bool removeAero = false;
+            string v = null;
+            string prefix = null;
+            string folder = null;
+            Dispatcher.Invoke(() =>
+            {
+                workAreaAndTitle = CheckBoxTitle.IsChecked.Value;
+                tryProtect = _checkTryProtectMenuItem.Checked;
+                cutFull = _checkCutFullMenuItem.Checked;
+                removeAero = _checkRemoveAeroMenuItem.Checked;
+                v = TextboxMs.Text;
+                prefix = TextboxPrefix.Text;
+                folder = TextboxPath.Text;
+            }, System.Windows.Threading.DispatcherPriority.Send);
+
+            while (folder == null)
+            {
+                Thread.Sleep(1);
+            }
+            if (string.IsNullOrEmpty(v))
+            {
+                con = 1;
+            }
+            else
+            {
+                con = int.Parse(v);
+            }
+            sw.Restart();
+            while (_isRunning)
+            {
+                lastTick = sw.ElapsedMilliseconds;
+                handle = NativeMethods.GetForegroundWindow();
+                if (handle != lastHandle)
+                {
+                    if (lastHandle != IntPtr.Zero)
+                    {
+
+                        if (needRestNcrp)
+                        {
+                            ncrp = NCRP_ENABLED;
+                            NativeMethods.DwmSetWindowAttribute(handle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4);
+                        }
+                        if (affState != 0)
+                        {
+                            NativeMethods.SetWindowDisplayAffinity(handle, affState);
+                        }
+                    }
+                    lastHandle = handle;
+                    NativeMethods.SHQueryUserNotificationState(out int winStyle);
+                    isFullScreen = winStyle == 2 || winStyle == 3;
+                    ncrp = 0;
+                    needRestNcrp = false;
+                    if (!tryProtect)
+                    {
+                        affState = 0;
+                    }
+                    else if (!NativeMethods.GetWindowDisplayAffinity(lastHandle, out affState))
+                    {
+                        affState = 0;
+                    }
+                    else if (affState != 0)
+                    {
+                        NativeMethods.SetWindowDisplayAffinity(lastHandle, 0);
+                    }
+                    if (!isFullScreen)
+                    {
+                        if (removeAero &&
+                             NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_NCRENDERING_ENABLED, ref ncrp, 4) == 0 &&
+                             ncrp == NCRP_ENABLED)
+                        {
+                            ncrp = NCRP_DISABLED;
+                            needRestNcrp = NativeMethods.DwmSetWindowAttribute(lastHandle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4) == 0;
+                        }
+                    }
+                }
+                if (!isFullScreen)
+                {
+                    if ((cutFull && workAreaAndTitle) || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    {
+                        NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    }
+                    if (workAreaAndTitle)
+                    {
+                        bounds = rect.ToRectangle();
+                    }
+                    else
+                    {
+
+                        NativeMethods.GetClientRect(lastHandle, ref realRect);
+                        bounds = rect.ToRectangle(in realRect);
+                    }
+                }
+                else
+                {
+                    NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    bounds = rect.ToRectangle();
+                }
+                SaveImage(bounds, prefix, folder);
+                lastTick = sw.ElapsedMilliseconds - lastTick;
+                if (lastTick < con)
+                {
+                    Thread.Sleep((int)(con - lastTick));
+                }
+            }
+            sw.Stop();
+        }
+
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
 
@@ -449,72 +602,121 @@ namespace YasoCut
                 return IntPtr.Zero;
             }
 
-            IntPtr handle = NativeMethods.GetForegroundWindow();
-            NativeRect rect = new NativeRect();
-            Rectangle bounds;
-            NativeMethods.SHQueryUserNotificationState(out int winStyle);
-            int ncrp = 0;
-            bool needRestNcrp = false;
-            int affState;
-            if (!_checkTryProtectMenuItem.Checked)
+            if (_checkComMsMenuItem.Checked)
             {
-                affState = 0;
-            }
-            else if (!NativeMethods.GetWindowDisplayAffinity(handle, out affState))
-            {
-                affState = 0;
-            }
-            else if (affState != 0)
-            {
-                NativeMethods.SetWindowDisplayAffinity(handle, 0);
-            }
-            if (winStyle != 2 && winStyle != 3)
-            {
-                if (_checkRemoveAeroMenuItem.Checked &&
-                    NativeMethods.DwmGetWindowAttribute(handle, DWMWA_NCRENDERING_ENABLED, ref ncrp, 4) == 0 &&
-                    ncrp == NCRP_ENABLED)
+                if (_isRunning)
                 {
-                    ncrp = NCRP_DISABLED;
-                    needRestNcrp = NativeMethods.DwmSetWindowAttribute(handle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4) == 0;
-                }
-                bool workAreaAndTitle = CheckBoxTitle.IsChecked.Value;
-                if ((_checkCutFullMenuItem.Checked && workAreaAndTitle) || NativeMethods.DwmGetWindowAttribute(handle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
-                {
-                    NativeMethods.GetWindowRect(handle, ref rect);
-                }
-                if (workAreaAndTitle)
-                {
-                    bounds = rect.ToRectangle();
+                    _isRunning = false;
+                    GridMain.IsEnabled = true;
+                    _menuFormatMenuItem.Enabled = true;
+                    _comboFormatMenuItem.Enabled = true;
+                    _checkCopyMenuItem.Enabled = true;
+                    _checkCutFullMenuItem.Enabled = true;
+                    _checkShowTipMenuItem.Enabled = true;
+                    _checkClickTipOpenFolderMenuItem.Enabled = true;
+                    _checkClickTipOpenFileMenuItem.Enabled = true;
+                    _checkRemoveAeroMenuItem.Enabled = true;
+                    _checkNotSaveMenuItem.Enabled = true;
+                    _checkTryProtectMenuItem.Enabled = true;
+                    _checkComMsMenuItem.Enabled = true;
+                    while (_backThread.IsAlive)
+                    {
+                        Thread.Sleep(1);
+                    }
+                    _backThread = null;
                 }
                 else
                 {
-                    NativeRect realRect = new NativeRect();
-                    NativeMethods.GetClientRect(handle, ref realRect);
-                    bounds = rect.ToRectangle(in realRect);
+
+                    _isRunning = true;
+                    GridMain.IsEnabled = false;
+                    _menuFormatMenuItem.Enabled = false;
+                    _comboFormatMenuItem.Enabled = false;
+                    _checkCopyMenuItem.Enabled = false;
+                    _checkCutFullMenuItem.Enabled = false;
+                    _checkShowTipMenuItem.Enabled = false;
+                    _checkClickTipOpenFolderMenuItem.Enabled = false;
+                    _checkClickTipOpenFileMenuItem.Enabled = false;
+                    _checkRemoveAeroMenuItem.Enabled = false;
+                    _checkNotSaveMenuItem.Enabled = false;
+                    _checkTryProtectMenuItem.Enabled = false;
+                    _checkComMsMenuItem.Enabled = false;
+                    _backThread = new Thread(BackWorkThread)
+                    {
+                        Priority = ThreadPriority.Highest,
+                        IsBackground = true
+                    };
+                    _backThread.Start();
                 }
             }
             else
             {
-                NativeMethods.GetWindowRect(handle, ref rect);
-                bounds = rect.ToRectangle();
+                IntPtr handle = NativeMethods.GetForegroundWindow();
+                NativeRect rect = new NativeRect();
+                Rectangle bounds;
+                NativeMethods.SHQueryUserNotificationState(out int winStyle);
+                int ncrp = 0;
+                bool needRestNcrp = false;
+                int affState;
+                if (!_checkTryProtectMenuItem.Checked)
+                {
+                    affState = 0;
+                }
+                else if (!NativeMethods.GetWindowDisplayAffinity(handle, out affState))
+                {
+                    affState = 0;
+                }
+                else if (affState != 0)
+                {
+                    NativeMethods.SetWindowDisplayAffinity(handle, 0);
+                }
+                if (winStyle != 2 && winStyle != 3)
+                {
+                    if (_checkRemoveAeroMenuItem.Checked &&
+                        NativeMethods.DwmGetWindowAttribute(handle, DWMWA_NCRENDERING_ENABLED, ref ncrp, 4) == 0 &&
+                        ncrp == NCRP_ENABLED)
+                    {
+                        ncrp = NCRP_DISABLED;
+                        needRestNcrp = NativeMethods.DwmSetWindowAttribute(handle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4) == 0;
+                    }
+                    bool workAreaAndTitle = CheckBoxTitle.IsChecked.Value;
+                    if ((_checkCutFullMenuItem.Checked && workAreaAndTitle) || NativeMethods.DwmGetWindowAttribute(handle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    {
+                        NativeMethods.GetWindowRect(handle, ref rect);
+                    }
+                    if (workAreaAndTitle)
+                    {
+                        bounds = rect.ToRectangle();
+                    }
+                    else
+                    {
+                        NativeRect realRect = new NativeRect();
+                        NativeMethods.GetClientRect(handle, ref realRect);
+                        bounds = rect.ToRectangle(in realRect);
+                    }
+                }
+                else
+                {
+                    NativeMethods.GetWindowRect(handle, ref rect);
+                    bounds = rect.ToRectangle();
+                }
+
+                SaveImage(bounds, TextboxPrefix.Text, TextboxPath.Text);
+                if (needRestNcrp)
+                {
+                    ncrp = NCRP_ENABLED;
+                    NativeMethods.DwmSetWindowAttribute(handle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4);
+                }
+                if (affState != 0)
+                {
+                    NativeMethods.SetWindowDisplayAffinity(handle, affState);
+                }
             }
             handled = true;
-            SaveImage(bounds);
-
-            if (needRestNcrp)
-            {
-                ncrp = NCRP_ENABLED;
-                NativeMethods.DwmSetWindowAttribute(handle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4);
-            }
-            if (affState != 0)
-            {
-                NativeMethods.SetWindowDisplayAffinity(handle, affState);
-            }
-
             return IntPtr.Zero;
         }
 
-        private void SaveImage(in Rectangle bounds)
+        private void SaveImage(in Rectangle bounds, string prefix, string folder)
         {
             bool notSave = _checkNotSaveMenuItem.Checked;
             Bitmap bmp = null;
@@ -556,14 +758,14 @@ namespace YasoCut
 
             if (!notSave)
             {
-                var fileName = $"{TextboxPrefix.Text}{DateTime.Now:yyyyMMddHHmmssfff}.{format.GetImageExtensionName()}";
-                _lastImgFile = $"{TextboxPath.Text}\\{fileName}";
+                var fileName = $"{prefix}{DateTime.Now:yyyyMMddHHmmssfff}.{format.GetImageExtensionName()}";
+                _lastImgFile = $"{folder}\\{fileName}";
                 try
                 {
                     bmp.Save(_lastImgFile, format.GetImageFormat());
                     if (_checkShowTipMenuItem.Checked)
                     {
-                        this._notifyIcon.ShowBalloonTip(1000, "截图保存成功", $"{TextboxPath.Text}\n{fileName}", System.Windows.Forms.ToolTipIcon.Info);
+                        this._notifyIcon.ShowBalloonTip(1000, "截图保存成功", $"{folder}\n{fileName}", System.Windows.Forms.ToolTipIcon.Info);
                     }
                 }
                 catch (Exception ex)
@@ -590,6 +792,7 @@ namespace YasoCut
                     WindowTitle.Title = "YasoCut - 快捷键无效";
                     return;
                 }
+                TextboxMs.IsEnabled = true;
                 _isSettingShortCut = false;
                 TextboxShotcut.IsEnabled = false;
                 TextboxPrefix.IsEnabled = true;
@@ -611,6 +814,7 @@ namespace YasoCut
             {
                 ButtonShotcut.Content = "保存快捷键";
                 NativeMethods.UnregisterHotKey(_hwndHelper.Handle, _atom);
+                TextboxMs.IsEnabled = false;
                 ButtonShotcut.IsEnabled = false;
                 _isShortCutKeyOn = false;
                 _isSettingShortCut = true;
@@ -732,6 +936,14 @@ namespace YasoCut
                     yasocut.SetValue("RemoveAero", removeAero, RegistryValueKind.DWord);
                 }
                 _checkRemoveAeroMenuItem.Checked = removeAero != 0;
+
+                if (!(yasocut.GetValue("ConMs") is int comMs))
+                {
+                    comMs = 1;
+                    yasocut.SetValue("ConMs", comMs, RegistryValueKind.DWord);
+                }
+                TextboxMs.Text = comMs.ToString();
+
 
                 if (!(yasocut.GetValue("ShowTip") is int showTip))
                 {
@@ -911,5 +1123,72 @@ namespace YasoCut
             return false;
         }
 
+        private void TextboxMs_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            switch (e.Key)
+            {
+                case Key.Back:
+                case Key.CapsLock:
+                case Key.Escape:
+                case Key.Left:
+                case Key.Up:
+                case Key.Right:
+                case Key.Down:
+                case Key.Delete:
+                case Key.D0:
+                case Key.D1:
+                case Key.D2:
+                case Key.D3:
+                case Key.D4:
+                case Key.D5:
+                case Key.D6:
+                case Key.D7:
+                case Key.D8:
+                case Key.D9:
+                case Key.NumPad0:
+                case Key.NumPad1:
+                case Key.NumPad2:
+                case Key.NumPad3:
+                case Key.NumPad4:
+                case Key.NumPad5:
+                case Key.NumPad6:
+                case Key.NumPad7:
+                case Key.NumPad8:
+                case Key.NumPad9:
+                case Key.NumLock:
+                    break;
+                default:
+                    e.Handled = true;
+                    break;
+            }
+        }
+
+
+        private bool _setTextboxMs = false;
+        private void TextboxMs_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!_inited)
+            {
+                return;
+            }
+            if (_setTextboxMs)
+            {
+                return;
+            }
+            _setTextboxMs = true;
+            string str = TextboxMs.Text;
+            if (string.IsNullOrWhiteSpace(str) || !int.TryParse(str, out int value) || value <= 0)
+            {
+                TextboxMs.Text = string.Empty;
+                value = 1;
+            }
+            using (RegistryKey soft = Registry.CurrentUser.OpenSubKey("SOFTWARE", true))
+            {
+                RegistryKey yasocut = soft.OpenSubKey("YasoCut", true) ?? soft.CreateSubKey("YasoCut", true);
+                yasocut.SetValue("ConMs", value, RegistryValueKind.DWord);
+                yasocut.Dispose();
+            }
+            _setTextboxMs = false;
+        }
     }
 }
