@@ -76,7 +76,7 @@ namespace YasoCut
                 {
                     soft.DeleteSubKeyTree("YasoCut");
                 }
-                MessageBox.Show("所有注册表信息已经清除完毕！", "YasoCut");
+                MessageBox.Show("所有注册表信息已经清除完毕！", "YasoCut", MessageBoxButton.OK, MessageBoxImage.Information);
                 _notExit = false;
                 Close();
             }
@@ -516,36 +516,63 @@ namespace YasoCut
 
         private void SaveImage(in Rectangle bounds)
         {
-            using (Bitmap bmp = new Bitmap(bounds.Width, bounds.Height))
+            bool notSave = _checkNotSaveMenuItem.Checked;
+            Bitmap bmp = null;
+            Graphics g = null;
+            try
             {
-                using (Graphics g = Graphics.FromImage(bmp))
+                bmp = new Bitmap(bounds.Width, bounds.Height);
+                g = Graphics.FromImage(bmp);
+                g.CopyFromScreen(new System.Drawing.Point(bounds.Left, bounds.Top), System.Drawing.Point.Empty, bounds.Size);
+            }
+            catch (Exception ex)
+            {
+                this._notifyIcon.ShowBalloonTip(1000, $"截图失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                if (bmp != null)
                 {
-                    g.CopyFromScreen(new System.Drawing.Point(bounds.Left, bounds.Top), System.Drawing.Point.Empty, bounds.Size);
+                    bmp.Dispose();
+                    bmp = null;
+                    return;
                 }
-                var format = (ImageFormatType)_comboFormatMenuItem.SelectedIndex;
-                if (_checkNotSaveMenuItem.Checked || _checkCopyMenuItem.Checked)
+            }
+            finally
+            {
+                g?.Dispose();
+            }
+
+            var format = (ImageFormatType)_comboFormatMenuItem.SelectedIndex;
+
+            if (notSave || _checkCopyMenuItem.Checked)
+            {
+                try
                 {
                     System.Windows.Forms.Clipboard.SetImage(bmp);
                 }
-                if (!_checkNotSaveMenuItem.Checked)
+                catch (Exception ex)
                 {
-                    _lastImgFile = $"{TextboxPath.Text}\\{TextboxPrefix.Text}{DateTime.Now:yyyyMMddHHmmssfff}.{format.GetImageExtensionName()}";
-                    try
+                    this._notifyIcon.ShowBalloonTip(1000, $"截图到剪切板失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                }
+            }
+
+            if (!notSave)
+            {
+                var fileName = $"{TextboxPrefix.Text}{DateTime.Now:yyyyMMddHHmmssfff}.{format.GetImageExtensionName()}";
+                _lastImgFile = $"{TextboxPath.Text}\\{fileName}";
+                try
+                {
+                    bmp.Save(_lastImgFile, format.GetImageFormat());
+                    if (_checkShowTipMenuItem.Checked)
                     {
-                        bmp.Save(_lastImgFile, format.GetImageFormat());
-                        if (_checkShowTipMenuItem.Checked)
-                        {
-                            this._notifyIcon.ShowBalloonTip(1000, $"截图成功!\n{_lastImgFile}", "YasoCut", System.Windows.Forms.ToolTipIcon.Info);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _lastImgFile = null;
-                        this._notifyIcon.ShowBalloonTip(1000, $"截图失败!\n{ex}", "YasoCut", System.Windows.Forms.ToolTipIcon.Info);
+                        this._notifyIcon.ShowBalloonTip(1000, "截图保存成功", $"{TextboxPath.Text}\n{fileName}", System.Windows.Forms.ToolTipIcon.Info);
                     }
                 }
-
+                catch (Exception ex)
+                {
+                    _lastImgFile = null;
+                    this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Info);
+                }
             }
+            bmp.Dispose();
         }
 
         private void ButtonShotcut_Click(object sender, RoutedEventArgs e)
@@ -556,7 +583,7 @@ namespace YasoCut
 
                 if (!_isShortCutKeyOn)
                 {
-                    MessageBox.Show("注册全局快捷键失败！", "错误", MessageBoxButton.OK);
+                    MessageBox.Show("注册全局快捷键失败！", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                     _modifierKeys = 0;
                     _vkey = 0;
                     TextboxShotcut.Text = string.Empty;
@@ -766,7 +793,7 @@ namespace YasoCut
                 }
                 else
                 {
-                    MessageBox.Show("注册全局快捷键失败！", "错误", MessageBoxButton.OK);
+                    MessageBox.Show("注册全局快捷键失败！", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                     _modifierKeys = 0;
                     _vkey = 0;
                     TextboxShotcut.Text = string.Empty;
@@ -839,7 +866,7 @@ namespace YasoCut
             string prefix = TextboxPrefix.Text;
             if (IsInvalid(prefix))
             {
-                MessageBox.Show("前缀中包含非法字符。", "错误", MessageBoxButton.OK);
+                MessageBox.Show("前缀中包含非法字符。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 TextboxPrefix.Text = string.Empty;
                 return;
             }
