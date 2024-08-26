@@ -726,6 +726,7 @@ namespace YasoCut
                     _checkNotSaveMenuItem.Enabled = true;
                     _checkTryProtectMenuItem.Enabled = true;
                     _checkComMsMenuItem.Enabled = true;
+                    _notifyIcon.Text = WindowTitle.Title = "YasoCut - 连续模式";
                     while (_backThread.IsAlive /*|| _backThread2.IsAlive*/)
                     {
                         Thread.Sleep(1);
@@ -735,7 +736,7 @@ namespace YasoCut
                 }
                 else
                 {
-
+                    _notifyIcon.Text = WindowTitle.Title = "YasoCut - 连续模式(执行中)";
                     _isRunning = true;
                     GridMain.IsEnabled = false;
                     _menuFormatMenuItem.Enabled = false;
