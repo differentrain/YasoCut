@@ -1,13 +1,17 @@
 ﻿using Microsoft.Win32;
 
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -66,7 +70,9 @@ namespace YasoCut
         private bool _notExit = true;
         private string _lastImgFile;
         private Thread _backThread;
-        private string _myTitle = "YasoCut";
+        //   private Thread _backThread2;
+        //    private readonly Queue<Bitmap> _queue = new Queue<Bitmap>();
+
         public Mutex MyMutex { get; }
 
         public MainWindow()
@@ -454,7 +460,7 @@ namespace YasoCut
                 if (_isRunning)
                 {
                     _isRunning = false;
-                    while (_backThread.IsAlive)
+                    while (_backThread.IsAlive /*|| _backThread2.IsAlive*/)
                     {
                         Thread.Sleep(1);
                     }
@@ -480,8 +486,7 @@ namespace YasoCut
 
         private void BackWorkThread()
         {
-            var sw = new Stopwatch();
-
+            Stopwatch sw = new Stopwatch();
             IntPtr lastHandle = IntPtr.Zero;
             NativeRect rect = new NativeRect();
             NativeRect realRect = new NativeRect();
@@ -493,21 +498,24 @@ namespace YasoCut
             int affState = 0;
             long lastTick;
             long con;
-
-
+            var format = (ImageFormatType)_comboFormatMenuItem.SelectedIndex;
+            string extension = format.GetImageExtensionName();
+            ImageFormat formatR = format.GetImageFormat();
             bool workAreaAndTitle = false;
-            bool tryProtect = false;
-            bool cutFull = false;
-            bool removeAero = false;
+            bool tryProtect = _checkTryProtectMenuItem.Checked;
+            bool cutFull = _checkCutFullMenuItem.Checked;
+            bool removeAero = _checkRemoveAeroMenuItem.Checked;
+            //  bool isShowTip = _checkShowTipMenuItem.Checked;
             string v = null;
             string prefix = null;
             string folder = null;
+            _lastImgFile = null;
+            Bitmap bmp = null;
+            Graphics g = null;
+            string fileName;
             Dispatcher.Invoke(() =>
             {
                 workAreaAndTitle = CheckBoxTitle.IsChecked.Value;
-                tryProtect = _checkTryProtectMenuItem.Checked;
-                cutFull = _checkCutFullMenuItem.Checked;
-                removeAero = _checkRemoveAeroMenuItem.Checked;
                 v = TextboxMs.Text;
                 prefix = TextboxPrefix.Text;
                 folder = TextboxPath.Text;
@@ -525,7 +533,7 @@ namespace YasoCut
             {
                 con = int.Parse(v);
             }
-            sw.Restart();
+            sw.Start();
             while (_isRunning)
             {
                 lastTick = sw.ElapsedMilliseconds;
@@ -575,27 +583,76 @@ namespace YasoCut
                 }
                 if (!isFullScreen)
                 {
-                    if ((cutFull && workAreaAndTitle) || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
-                    {
-                        NativeMethods.GetWindowRect(lastHandle, ref rect);
-                    }
                     if (workAreaAndTitle)
                     {
+                        if (cutFull || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                        {
+                            NativeMethods.GetWindowRect(lastHandle, ref rect);
+                        }
                         bounds = rect.ToRectangle();
                     }
                     else
                     {
-
+                        if (NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                        {
+                            NativeMethods.GetWindowRect(lastHandle, ref rect);
+                        }
                         NativeMethods.GetClientRect(lastHandle, ref realRect);
                         bounds = rect.ToRectangle(in realRect);
                     }
+                    //if ((cutFull && workAreaAndTitle) || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    //{
+                    //    NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    //}
+                    //if (workAreaAndTitle)
+                    //{
+                    //    bounds = rect.ToRectangle();
+                    //}
+                    //else
+                    //{
+
+                    //    NativeMethods.GetClientRect(lastHandle, ref realRect);
+                    //    bounds = rect.ToRectangle(in realRect);
+                    //}
                 }
                 else
                 {
                     NativeMethods.GetWindowRect(lastHandle, ref rect);
                     bounds = rect.ToRectangle();
                 }
-                SaveImage(bounds, prefix, folder, true);
+
+                try
+                {
+                    bmp = new Bitmap(bounds.Width, bounds.Height);
+                    g = Graphics.FromImage(bmp);
+                    g.CopyFromScreen(new System.Drawing.Point(bounds.Left, bounds.Top), System.Drawing.Point.Empty, bounds.Size);
+                }
+                catch (Exception ex)
+                {
+                    this._notifyIcon.ShowBalloonTip(1000, $"截图失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                    if (bmp != null)
+                    {
+                        bmp.Dispose();
+                        bmp = null;
+                        continue;
+                    }
+                }
+                finally
+                {
+                    g?.Dispose();
+                }
+
+                fileName = $"{prefix}{DateTime.Now:yyyyMMddHHmmssfff}.{extension}";
+                try
+                {
+                    bmp.Save($"{folder}\\{fileName}", formatR);
+                }
+                catch (Exception ex)
+                {
+                    this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Info);
+                }
+
+                bmp.Dispose();
                 lastTick = sw.ElapsedMilliseconds - lastTick;
                 if (lastTick < con)
                 {
@@ -604,6 +661,45 @@ namespace YasoCut
             }
             sw.Stop();
         }
+
+        //  private static readonly object s_locker = new object();
+
+
+        //private void SaveImageConCore(string extension, ImageFormat formatR)
+        //{
+
+        //    Bitmap bmp = null;
+        //    bool isShowTip = _checkShowTipMenuItem.Checked;
+        //    string fileName;
+        //    while (_isRunning || _queue.Count > 0)
+        //    {
+        //        if (_queue.Count > 0)
+        //        {
+        //            lock (s_locker)
+        //            {
+        //                bmp = _queue.Dequeue();
+        //            }
+        //            fileName = $"{_prefix}{DateTime.Now:yyyyMMddHHmmssfff}.{extension}";
+        //            _lastImgFile = $"{_folder}\\{fileName}";
+        //            try
+        //            {
+        //                bmp.Save(_lastImgFile, formatR);
+        //                if (isShowTip)
+        //                {
+        //                    this._notifyIcon.ShowBalloonTip(1000, "截图保存成功", $"{_folder}\n{fileName}", System.Windows.Forms.ToolTipIcon.Info);
+        //                }
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                _lastImgFile = null;
+        //                this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Info);
+        //            }
+
+        //            bmp.Dispose();
+        //        }
+        //        Thread.Sleep(20);
+        //    }
+        //}
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
@@ -630,11 +726,12 @@ namespace YasoCut
                     _checkNotSaveMenuItem.Enabled = true;
                     _checkTryProtectMenuItem.Enabled = true;
                     _checkComMsMenuItem.Enabled = true;
-                    while (_backThread.IsAlive)
+                    while (_backThread.IsAlive /*|| _backThread2.IsAlive*/)
                     {
                         Thread.Sleep(1);
                     }
                     _backThread = null;
+                    //_backThread2 = null;
                 }
                 else
                 {
@@ -654,10 +751,17 @@ namespace YasoCut
                     _checkComMsMenuItem.Enabled = false;
                     _backThread = new Thread(BackWorkThread)
                     {
-                        Priority = ThreadPriority.Highest,
+                        Priority = ThreadPriority.Normal,
                         IsBackground = true
                     };
                     _backThread.Start();
+                    //_backThread2 = new Thread(SaveImageConCore)
+                    //{
+                    //    Priority = ThreadPriority.Highest,
+                    //    IsBackground = true
+                    //};
+
+                    //_backThread2.Start();
                 }
             }
             else
@@ -712,7 +816,7 @@ namespace YasoCut
                     bounds = rect.ToRectangle();
                 }
 
-                SaveImage(bounds, TextboxPrefix.Text, TextboxPath.Text, false);
+                SaveImage(bounds, TextboxPrefix.Text, TextboxPath.Text);
                 if (needRestNcrp)
                 {
                     ncrp = NCRP_ENABLED;
@@ -727,7 +831,7 @@ namespace YasoCut
             return IntPtr.Zero;
         }
 
-        private void SaveImage(in Rectangle bounds, string prefix, string folder, bool isCom)
+        private void SaveImage(in Rectangle bounds, string prefix, string folder)
         {
             bool notSave = _checkNotSaveMenuItem.Checked;
             Bitmap bmp = null;
@@ -755,7 +859,7 @@ namespace YasoCut
 
             var format = (ImageFormatType)_comboFormatMenuItem.SelectedIndex;
 
-            if (!isCom && (notSave || _checkCopyMenuItem.Checked))
+            if (notSave || _checkCopyMenuItem.Checked)
             {
                 try
                 {
@@ -767,7 +871,7 @@ namespace YasoCut
                 }
             }
 
-            if (isCom || !notSave)
+            if (!notSave)
             {
                 var fileName = $"{prefix}{DateTime.Now:yyyyMMddHHmmssfff}.{format.GetImageExtensionName()}";
                 _lastImgFile = $"{folder}\\{fileName}";
