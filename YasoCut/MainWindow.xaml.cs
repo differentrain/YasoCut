@@ -66,6 +66,7 @@ namespace YasoCut
         private bool _notExit = true;
         private string _lastImgFile;
         private Thread _backThread;
+        private string _myTitle = "YasoCut";
         public Mutex MyMutex { get; }
 
         public MainWindow()
@@ -87,6 +88,9 @@ namespace YasoCut
                 string myGuid = Assembly.GetExecutingAssembly().GetCustomAttribute<GuidAttribute>().Value;
 
                 MyMutex = new Mutex(true, Assembly.GetExecutingAssembly().GetCustomAttribute<GuidAttribute>().Value, out var createNew);
+#if DEBUG
+                createNew = true;
+#endif
                 if (!createNew)
                 {
                     _notExit = false;
@@ -260,6 +264,7 @@ namespace YasoCut
         private void CheckComMsMenuItem_Click(object sender, EventArgs e)
         {
             TextboxMs.IsEnabled = _checkComMsMenuItem.Checked;
+            _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ? "YasoCut - 连续模式" : "YasoCut";
         }
 
         private void CheckTryProtectMenuItem_Click(object sender, EventArgs e)
@@ -274,11 +279,6 @@ namespace YasoCut
 
         private void CheckNotSaveMenuItem_Click(object sender, EventArgs e)
         {
-            TextboxPrefix.IsEnabled = !_checkNotSaveMenuItem.Checked;
-            TextboxPath.IsEnabled = !_checkNotSaveMenuItem.Checked;
-            ButtonOpen.IsEnabled = !_checkNotSaveMenuItem.Checked;
-            ButtonSelect.IsEnabled = !_checkNotSaveMenuItem.Checked;
-            _menuFormatMenuItem.Enabled = !_checkNotSaveMenuItem.Checked;
             using (RegistryKey soft = Registry.CurrentUser.OpenSubKey("SOFTWARE", true))
             {
                 RegistryKey yasocut = soft.OpenSubKey("YasoCut", true) ?? soft.CreateSubKey("YasoCut", true);
@@ -801,18 +801,19 @@ namespace YasoCut
                     _vkey = 0;
                     TextboxShotcut.Text = string.Empty;
                     WindowTitle.Title = "YasoCut - 快捷键无效";
+                    ButtonShotcut.IsEnabled = false;
                     return;
                 }
                 TextboxMs.IsEnabled = _checkComMsMenuItem.Checked;
                 _isSettingShortCut = false;
                 TextboxShotcut.IsEnabled = false;
-                TextboxPrefix.IsEnabled = !_checkNotSaveMenuItem.Checked;
-                TextboxPath.IsEnabled = !_checkNotSaveMenuItem.Checked;
-                ButtonOpen.IsEnabled = !_checkNotSaveMenuItem.Checked;
-                ButtonSelect.IsEnabled = !_checkNotSaveMenuItem.Checked;
+                TextboxPrefix.IsEnabled = true;
+                TextboxPath.IsEnabled = true;
+                ButtonOpen.IsEnabled = true;
+                ButtonSelect.IsEnabled = true;
                 CheckBoxTitle.IsEnabled = true;
                 ButtonShotcut.Content = "设置快捷键";
-                WindowTitle.Title = "YasoCut";
+                _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ? "YasoCut - 连续模式" : "YasoCut";
                 using (RegistryKey soft = Registry.CurrentUser.OpenSubKey("SOFTWARE", true))
                 {
                     long shortcut = ((long)(_modifierKeys) << 32)
@@ -823,6 +824,7 @@ namespace YasoCut
             }
             else
             {
+                _notifyIcon.Text = WindowTitle.Title = "YasoCut - 设置快捷键";
                 ButtonShotcut.Content = "保存快捷键";
                 NativeMethods.UnregisterHotKey(_hwndHelper.Handle, _atom);
                 TextboxMs.IsEnabled = false;
@@ -1012,7 +1014,7 @@ namespace YasoCut
                 if (_isShortCutKeyOn)
                 {
                     TextboxShotcut.Text = $"{_modifierKeys}, {KeyInterop.KeyFromVirtualKey(_vkey)}";
-                    WindowTitle.Title = "YasoCut";
+                    _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ? "YasoCut - 连续模式" : "YasoCut";
                 }
                 else
                 {
@@ -1020,16 +1022,25 @@ namespace YasoCut
                     _modifierKeys = 0;
                     _vkey = 0;
                     TextboxShotcut.Text = string.Empty;
-                    yasocut.SetValue("Shortcut", 0, RegistryValueKind.QWord);
-                    WindowTitle.Title = "YasoCut - 快捷键无效";
+                    _notifyIcon.Text = WindowTitle.Title = "YasoCut - 设置快捷键";
+                    ButtonShotcut.Content = "保存快捷键";
+                    NativeMethods.UnregisterHotKey(_hwndHelper.Handle, _atom);
+                    TextboxMs.IsEnabled = false;
+                    ButtonShotcut.IsEnabled = false;
+                    _isShortCutKeyOn = false;
+                    _isSettingShortCut = true;
+                    TextboxShotcut.IsEnabled = true;
+                    TextboxShotcut.Text = string.Empty;
+                    TextboxPrefix.IsEnabled = false;
+                    TextboxPath.IsEnabled = false;
+                    ButtonOpen.IsEnabled = false;
+                    ButtonSelect.IsEnabled = false;
+                    CheckBoxTitle.IsEnabled = false;
+                    TextboxShotcut.Focus();
+
                 }
                 yasocut.Dispose();
             }
-            TextboxPrefix.IsEnabled = !_checkNotSaveMenuItem.Checked;
-            TextboxPath.IsEnabled = !_checkNotSaveMenuItem.Checked;
-            ButtonOpen.IsEnabled = !_checkNotSaveMenuItem.Checked;
-            ButtonSelect.IsEnabled = !_checkNotSaveMenuItem.Checked;
-            _menuFormatMenuItem.Enabled = !_checkNotSaveMenuItem.Checked;
             _inited = true;
         }
 
