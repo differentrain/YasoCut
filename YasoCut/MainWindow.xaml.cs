@@ -583,37 +583,37 @@ namespace YasoCut
                 }
                 if (!isFullScreen)
                 {
-                    if (workAreaAndTitle)
-                    {
-                        if (cutFull || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
-                        {
-                            NativeMethods.GetWindowRect(lastHandle, ref rect);
-                        }
-                        bounds = rect.ToRectangle();
-                    }
-                    else
-                    {
-                        if (NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
-                        {
-                            NativeMethods.GetWindowRect(lastHandle, ref rect);
-                        }
-                        NativeMethods.GetClientRect(lastHandle, ref realRect);
-                        bounds = rect.ToRectangle(in realRect);
-                    }
-                    //if ((cutFull && workAreaAndTitle) || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
-                    //{
-                    //    NativeMethods.GetWindowRect(lastHandle, ref rect);
-                    //}
                     //if (workAreaAndTitle)
                     //{
+                    //    if (cutFull || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    //    {
+                    //        NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    //    }
                     //    bounds = rect.ToRectangle();
                     //}
                     //else
                     //{
-
+                    //    if (NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    //    {
+                    //        NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    //    }
                     //    NativeMethods.GetClientRect(lastHandle, ref realRect);
                     //    bounds = rect.ToRectangle(in realRect);
                     //}
+                    if ((cutFull && workAreaAndTitle) || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    {
+                        NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    }
+                    if (workAreaAndTitle)
+                    {
+                        bounds = rect.ToRectangle();
+                    }
+                    else
+                    {
+
+                        NativeMethods.GetClientRect(lastHandle, ref realRect);
+                        bounds = rect.ToRectangle(in realRect);
+                    }
                 }
                 else
                 {
@@ -649,7 +649,7 @@ namespace YasoCut
                 }
                 catch (Exception ex)
                 {
-                    this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Info);
+                    this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
                 }
 
                 bmp.Dispose();
@@ -732,6 +732,7 @@ namespace YasoCut
                         Thread.Sleep(1);
                     }
                     _backThread = null;
+                    this._notifyIcon.ShowBalloonTip(1000, $"YasoCut", $"关闭连续截图", System.Windows.Forms.ToolTipIcon.Info);
                     //_backThread2 = null;
                 }
                 else
@@ -750,6 +751,7 @@ namespace YasoCut
                     _checkNotSaveMenuItem.Enabled = false;
                     _checkTryProtectMenuItem.Enabled = false;
                     _checkComMsMenuItem.Enabled = false;
+                    this._notifyIcon.ShowBalloonTip(1000, $"YasoCut", $"启动连续截图", System.Windows.Forms.ToolTipIcon.Info);
                     _backThread = new Thread(BackWorkThread)
                     {
                         Priority = ThreadPriority.Normal,
@@ -887,7 +889,7 @@ namespace YasoCut
                 catch (Exception ex)
                 {
                     _lastImgFile = null;
-                    this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Info);
+                    this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
                 }
             }
             bmp.Dispose();
