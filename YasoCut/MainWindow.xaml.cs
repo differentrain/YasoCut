@@ -974,11 +974,7 @@ namespace YasoCut
             }
 
             if (Keyboard.IsKeyDown(Key.F12) ||
-                Keyboard.IsKeyDown(Key.System) ||
-                ((Keyboard.Modifiers & ModifierKeys.Alt) == ModifierKeys.None &&
-                 (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.None &&
-                 (Keyboard.Modifiers & ModifierKeys.Windows) == ModifierKeys.None &&
-                 (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.None))
+                Keyboard.IsKeyDown(Key.System))
             {
                 TextboxShotcut.Text = String.Empty;
                 _modifierKeys = ModifierKeys.None;
@@ -993,7 +989,17 @@ namespace YasoCut
             _modifierKeys = Keyboard.Modifiers;
             ButtonShotcut.IsEnabled = true;
             _vkey = KeyInterop.VirtualKeyFromKey(e.Key);
-            TextboxShotcut.Text = $"{_modifierKeys}, {e.Key}";
+
+            if (_modifierKeys != ModifierKeys.None)
+            {
+                TextboxShotcut.Text = $"{_modifierKeys}, {e.Key}";
+            }
+            else
+            {
+                TextboxShotcut.Text = $"{e.Key}";
+            }
+
+           
         }
 
         private void ReadReg()
@@ -1121,7 +1127,14 @@ namespace YasoCut
                 _isShortCutKeyOn = NativeMethods.RegisterHotKey(_hwndHelper.Handle, _atom, _modifierKeys, _vkey);
                 if (_isShortCutKeyOn)
                 {
-                    TextboxShotcut.Text = $"{_modifierKeys}, {KeyInterop.KeyFromVirtualKey(_vkey)}";
+                    if (_modifierKeys != ModifierKeys.None)
+                    {
+                        TextboxShotcut.Text = $"{_modifierKeys}, {KeyInterop.KeyFromVirtualKey(_vkey)}";
+                    }
+                    else
+                    {
+                        TextboxShotcut.Text = $"{KeyInterop.KeyFromVirtualKey(_vkey)}";
+                    }
                     _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ? "YasoCut - 连续模式" : "YasoCut";
                 }
                 else
