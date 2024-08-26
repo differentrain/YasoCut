@@ -650,6 +650,7 @@ namespace YasoCut
                 catch (Exception ex)
                 {
                     this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                    break;
                 }
 
                 bmp.Dispose();
