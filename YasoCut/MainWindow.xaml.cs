@@ -56,6 +56,7 @@ namespace YasoCut
         private int _vkey;
         private System.Windows.Forms.NotifyIcon _notifyIcon = null;
         private System.Windows.Forms.ToolStripMenuItem _checkNotExitMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _checkSilentMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _menuFormatMenuItem;
         private System.Windows.Forms.ToolStripComboBox _comboFormatMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkCopyMenuItem;
@@ -67,9 +68,11 @@ namespace YasoCut
         private System.Windows.Forms.ToolStripMenuItem _checkNotSaveMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkTryProtectMenuItem;
         private System.Windows.Forms.ToolStripMenuItem _checkComMsMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem _checkObModeMenuItem;
         private bool _notExit = true;
         private string _lastImgFile;
         private Thread _backThread;
+        private bool _silentMode = false;
         //   private Thread _backThread2;
         //    private readonly Queue<Bitmap> _queue = new Queue<Bitmap>();
 
@@ -136,6 +139,14 @@ namespace YasoCut
             };
             _checkNotExitMenuItem.Click += CheckNotExitMenuItem_Click;
             cms.Items.Add(_checkNotExitMenuItem);
+
+            _checkSilentMenuItem = new System.Windows.Forms.ToolStripMenuItem
+            {
+                Text = "禁用所有气泡提示",
+                CheckOnClick = true,
+            };
+            _checkSilentMenuItem.Click += CheckSilentMenuItem_Click; ;
+            cms.Items.Add(_checkSilentMenuItem);
 
             var separatorMenuItem3 = new System.Windows.Forms.ToolStripSeparator
             {
@@ -222,6 +233,14 @@ namespace YasoCut
             _checkComMsMenuItem.Click += CheckComMsMenuItem_Click;
             cms.Items.Add(_checkComMsMenuItem);
 
+            _checkObModeMenuItem = new System.Windows.Forms.ToolStripMenuItem
+            {
+                Text = "爆发模式",
+                CheckOnClick = true,
+            };
+            _checkObModeMenuItem.Click += CheckObModeMenuItem_Click;
+            cms.Items.Add(_checkObModeMenuItem);
+
             var separatorMenuItem4 = new System.Windows.Forms.ToolStripSeparator
             {
                 Text = "-",
@@ -267,10 +286,39 @@ namespace YasoCut
 
         }
 
+        private void CheckSilentMenuItem_Click(object sender, EventArgs e)
+        {
+            _silentMode = _checkSilentMenuItem.Checked;
+        }
+
+
+
+        private void CheckObModeMenuItem_Click(object sender, EventArgs e)
+        {
+            if (_checkObModeMenuItem.Checked)
+            {
+                _notifyIcon.Text = WindowTitle.Title = "YasoCut - 爆发模式";
+                _checkComMsMenuItem.Checked = false;
+            }
+            else
+            {
+                _notifyIcon.Text = WindowTitle.Title = "YasoCut";
+            }
+
+
+        }
+
         private void CheckComMsMenuItem_Click(object sender, EventArgs e)
         {
-            TextboxMs.IsEnabled = _checkComMsMenuItem.Checked;
-            _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ? "YasoCut - 连续模式" : "YasoCut";
+            if (_checkComMsMenuItem.Checked)
+            {
+                _notifyIcon.Text = WindowTitle.Title = "YasoCut - 连续模式";
+                _checkObModeMenuItem.Checked = false;
+            }
+            else
+            {
+                _notifyIcon.Text = WindowTitle.Title = "YasoCut";
+            }
         }
 
         private void CheckTryProtectMenuItem_Click(object sender, EventArgs e)
@@ -457,9 +505,9 @@ namespace YasoCut
                     _notifyIcon.Dispose();
                 }
 
-                if (_isRunning)
+                if (_isRunning != 0)
                 {
-                    _isRunning = false;
+                    _isRunning = 0;
                     while (_backThread.IsAlive /*|| _backThread2.IsAlive*/)
                     {
                         Thread.Sleep(1);
@@ -482,9 +530,17 @@ namespace YasoCut
             ReadReg();
         }
 
-        private bool _isRunning = false;
+        private int _isRunning = 0;
 
-        private void BackWorkThread()
+        private void ShowTips(string title, string text, System.Windows.Forms.ToolTipIcon icon)
+        {
+            if (_silentMode)
+            {
+                return;
+            }
+            this._notifyIcon.ShowBalloonTip(1000, title, text, icon);
+        }
+        private void BackWorkThreadCon()
         {
             Stopwatch sw = new Stopwatch();
             IntPtr lastHandle = IntPtr.Zero;
@@ -512,7 +568,6 @@ namespace YasoCut
             _lastImgFile = null;
             Bitmap bmp = null;
             Graphics g = null;
-            string fileName;
             Dispatcher.Invoke(() =>
             {
                 workAreaAndTitle = CheckBoxTitle.IsChecked.Value;
@@ -534,7 +589,7 @@ namespace YasoCut
                 con = int.Parse(v);
             }
             sw.Start();
-            while (_isRunning)
+            while (_isRunning != 0)
             {
                 lastTick = sw.ElapsedMilliseconds;
                 handle = NativeMethods.GetForegroundWindow();
@@ -629,7 +684,187 @@ namespace YasoCut
                 }
                 catch (Exception ex)
                 {
-                    this._notifyIcon.ShowBalloonTip(1000, $"截图失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                    ShowTips($"截图失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                    if (bmp != null)
+                    {
+                        bmp.Dispose();
+                        bmp = null;
+                        continue;
+                    }
+                }
+                finally
+                {
+                    g?.Dispose();
+                }
+                try
+                {
+                    bmp.Save($"{folder}\\{prefix}{DateTime.Now:yyyyMMddHHmmssfff}_con.{extension}", formatR);
+                }
+                catch (Exception ex)
+                {
+                    ShowTips($"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                    break;
+                }
+
+                bmp.Dispose();
+                lastTick = sw.ElapsedMilliseconds - lastTick;
+                if (lastTick < con)
+                {
+                    Thread.Sleep((int)(con - lastTick));
+                }
+            }
+            sw.Stop();
+        }
+
+        private void BackWorkThreadOB()
+        {
+            Stopwatch sw = new Stopwatch();
+            IntPtr lastHandle = IntPtr.Zero;
+            NativeRect rect = new NativeRect();
+            NativeRect realRect = new NativeRect();
+            Rectangle bounds;
+            IntPtr handle;
+            bool isFullScreen = false;
+            int ncrp = 0;
+            bool needRestNcrp = false;
+            int affState = 0;
+            long lastTick;
+            int con, count;
+            var format = (ImageFormatType)_comboFormatMenuItem.SelectedIndex;
+            string extension = format.GetImageExtensionName();
+            ImageFormat formatR = format.GetImageFormat();
+            bool workAreaAndTitle = false;
+            bool tryProtect = _checkTryProtectMenuItem.Checked;
+            bool cutFull = _checkCutFullMenuItem.Checked;
+            bool removeAero = _checkRemoveAeroMenuItem.Checked;
+            //  bool isShowTip = _checkShowTipMenuItem.Checked;
+            string vMs = null;
+            string prefix = null;
+            string folder = null;
+            _lastImgFile = null;
+            Bitmap bmp = null;
+            Graphics g = null;
+            string vCount = null;
+            Dispatcher.Invoke(() =>
+            {
+                workAreaAndTitle = CheckBoxTitle.IsChecked.Value;
+                vMs = TextboxMs.Text;
+                prefix = TextboxPrefix.Text;
+                folder = TextboxPath.Text;
+                vCount = TextboxOB.Text;
+            }, System.Windows.Threading.DispatcherPriority.Send);
+
+            while (vCount == null)
+            {
+                Thread.Sleep(1);
+            }
+            if (string.IsNullOrEmpty(vMs) || !int.TryParse(vMs, out con))
+            {
+                con = 1;
+            }
+
+            if (string.IsNullOrEmpty(vCount) || !int.TryParse(vCount, out count))
+            {
+                count = 1;
+            }
+            sw.Start();
+            int i = 0;
+            while (_isRunning != 0 && i < count)
+            {
+                lastTick = sw.ElapsedMilliseconds;
+                handle = NativeMethods.GetForegroundWindow();
+                if (handle != lastHandle)
+                {
+                    if (lastHandle != IntPtr.Zero)
+                    {
+
+                        if (needRestNcrp)
+                        {
+                            ncrp = NCRP_ENABLED;
+                            NativeMethods.DwmSetWindowAttribute(handle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4);
+                        }
+                        if (affState != 0)
+                        {
+                            NativeMethods.SetWindowDisplayAffinity(handle, affState);
+                        }
+                    }
+                    lastHandle = handle;
+                    NativeMethods.SHQueryUserNotificationState(out int winStyle);
+                    isFullScreen = winStyle == 2 || winStyle == 3;
+                    ncrp = 0;
+                    needRestNcrp = false;
+                    if (!tryProtect)
+                    {
+                        affState = 0;
+                    }
+                    else if (!NativeMethods.GetWindowDisplayAffinity(lastHandle, out affState))
+                    {
+                        affState = 0;
+                    }
+                    else if (affState != 0)
+                    {
+                        NativeMethods.SetWindowDisplayAffinity(lastHandle, 0);
+                    }
+                    if (!isFullScreen)
+                    {
+                        if (removeAero &&
+                             NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_NCRENDERING_ENABLED, ref ncrp, 4) == 0 &&
+                             ncrp == NCRP_ENABLED)
+                        {
+                            ncrp = NCRP_DISABLED;
+                            needRestNcrp = NativeMethods.DwmSetWindowAttribute(lastHandle, DWMWA_NCRENDERING_POLICY, ref ncrp, 4) == 0;
+                        }
+                    }
+                }
+                if (!isFullScreen)
+                {
+                    //if (workAreaAndTitle)
+                    //{
+                    //    if (cutFull || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    //    {
+                    //        NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    //    }
+                    //    bounds = rect.ToRectangle();
+                    //}
+                    //else
+                    //{
+                    //    if (NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    //    {
+                    //        NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    //    }
+                    //    NativeMethods.GetClientRect(lastHandle, ref realRect);
+                    //    bounds = rect.ToRectangle(in realRect);
+                    //}
+                    if ((cutFull && workAreaAndTitle) || NativeMethods.DwmGetWindowAttribute(lastHandle, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, NativeRect.Size) != 0)
+                    {
+                        NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    }
+                    if (workAreaAndTitle)
+                    {
+                        bounds = rect.ToRectangle();
+                    }
+                    else
+                    {
+
+                        NativeMethods.GetClientRect(lastHandle, ref realRect);
+                        bounds = rect.ToRectangle(in realRect);
+                    }
+                }
+                else
+                {
+                    NativeMethods.GetWindowRect(lastHandle, ref rect);
+                    bounds = rect.ToRectangle();
+                }
+
+                try
+                {
+                    bmp = new Bitmap(bounds.Width, bounds.Height);
+                    g = Graphics.FromImage(bmp);
+                    g.CopyFromScreen(new System.Drawing.Point(bounds.Left, bounds.Top), System.Drawing.Point.Empty, bounds.Size);
+                }
+                catch (Exception ex)
+                {
+                    ShowTips($"截图失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
                     if (bmp != null)
                     {
                         bmp.Dispose();
@@ -642,14 +877,14 @@ namespace YasoCut
                     g?.Dispose();
                 }
 
-                fileName = $"{prefix}{DateTime.Now:yyyyMMddHHmmssfff}.{extension}";
                 try
                 {
-                    bmp.Save($"{folder}\\{fileName}", formatR);
+                    bmp.Save($"{folder}\\{prefix}{DateTime.Now:yyyyMMddHHmmssfff}_ob.{extension}", formatR);
+                    ++i;
                 }
                 catch (Exception ex)
                 {
-                    this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                    ShowTips($"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
                     break;
                 }
 
@@ -659,6 +894,28 @@ namespace YasoCut
                 {
                     Thread.Sleep((int)(con - lastTick));
                 }
+            }
+
+            if (Interlocked.CompareExchange(ref _isRunning, 0, 1) != 0)
+            {
+                this.Dispatcher.Invoke(() =>
+                {
+                    GridMain.IsEnabled = true;
+                    _menuFormatMenuItem.Enabled = true;
+                    _comboFormatMenuItem.Enabled = true;
+                    _checkCopyMenuItem.Enabled = true;
+                    _checkCutFullMenuItem.Enabled = true;
+                    _checkShowTipMenuItem.Enabled = true;
+                    _checkClickTipOpenFolderMenuItem.Enabled = true;
+                    _checkClickTipOpenFileMenuItem.Enabled = true;
+                    _checkRemoveAeroMenuItem.Enabled = true;
+                    _checkNotSaveMenuItem.Enabled = true;
+                    _checkTryProtectMenuItem.Enabled = true;
+                    _checkComMsMenuItem.Enabled = true;
+                    _checkObModeMenuItem.Enabled = true;
+                    _notifyIcon.Text = WindowTitle.Title = $"YasoCut - 爆发模式";
+                    ShowTips($"YasoCut", $"停止爆发截图", System.Windows.Forms.ToolTipIcon.Info);
+                });
             }
             sw.Stop();
         }
@@ -702,6 +959,56 @@ namespace YasoCut
         //    }
         //}
 
+        private void SwitchConOrOb(ThreadStart ts, string type)
+        {
+
+            bool b = _isRunning != 0;
+
+
+            GridMain.IsEnabled = b;
+            _menuFormatMenuItem.Enabled = b;
+            _comboFormatMenuItem.Enabled = b;
+            _checkCopyMenuItem.Enabled = b;
+            _checkCutFullMenuItem.Enabled = b;
+            _checkShowTipMenuItem.Enabled = b;
+            _checkClickTipOpenFolderMenuItem.Enabled = b;
+            _checkClickTipOpenFileMenuItem.Enabled = b;
+            _checkRemoveAeroMenuItem.Enabled = b;
+            _checkNotSaveMenuItem.Enabled = b;
+            _checkTryProtectMenuItem.Enabled = b;
+            _checkComMsMenuItem.Enabled = b;
+            _checkObModeMenuItem.Enabled = b;
+
+            if (b)
+            {
+                if (Interlocked.CompareExchange(ref _isRunning, 0, 1) != 0)
+                {
+                    _notifyIcon.Text = WindowTitle.Title = $"YasoCut - {type}模式";
+                    while (_backThread.IsAlive /*|| _backThread2.IsAlive*/)
+                    {
+                        Thread.Sleep(1);
+                    }
+                    _backThread = null;
+                    ShowTips($"YasoCut", $"停止{type}截图", System.Windows.Forms.ToolTipIcon.Info);
+                }
+            }
+            else
+            {
+                _isRunning = 1;
+                _notifyIcon.Text = WindowTitle.Title = $"YasoCut - {type}模式(执行中)";
+
+                ShowTips($"YasoCut", $"启动{type}截图", System.Windows.Forms.ToolTipIcon.Info);
+                _backThread = new Thread(ts)
+                {
+                    Priority = ThreadPriority.Highest,
+                    IsBackground = true
+                };
+                _backThread.Start();
+              
+            }
+        }
+
+
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
 
@@ -712,61 +1019,11 @@ namespace YasoCut
 
             if (_checkComMsMenuItem.Checked)
             {
-                if (_isRunning)
-                {
-                    _isRunning = false;
-                    GridMain.IsEnabled = true;
-                    _menuFormatMenuItem.Enabled = true;
-                    _comboFormatMenuItem.Enabled = true;
-                    _checkCopyMenuItem.Enabled = true;
-                    _checkCutFullMenuItem.Enabled = true;
-                    _checkShowTipMenuItem.Enabled = true;
-                    _checkClickTipOpenFolderMenuItem.Enabled = true;
-                    _checkClickTipOpenFileMenuItem.Enabled = true;
-                    _checkRemoveAeroMenuItem.Enabled = true;
-                    _checkNotSaveMenuItem.Enabled = true;
-                    _checkTryProtectMenuItem.Enabled = true;
-                    _checkComMsMenuItem.Enabled = true;
-                    _notifyIcon.Text = WindowTitle.Title = "YasoCut - 连续模式";
-                    while (_backThread.IsAlive /*|| _backThread2.IsAlive*/)
-                    {
-                        Thread.Sleep(1);
-                    }
-                    _backThread = null;
-                    this._notifyIcon.ShowBalloonTip(1000, $"YasoCut", $"关闭连续截图", System.Windows.Forms.ToolTipIcon.Info);
-                    //_backThread2 = null;
-                }
-                else
-                {
-                    _notifyIcon.Text = WindowTitle.Title = "YasoCut - 连续模式(执行中)";
-                    _isRunning = true;
-                    GridMain.IsEnabled = false;
-                    _menuFormatMenuItem.Enabled = false;
-                    _comboFormatMenuItem.Enabled = false;
-                    _checkCopyMenuItem.Enabled = false;
-                    _checkCutFullMenuItem.Enabled = false;
-                    _checkShowTipMenuItem.Enabled = false;
-                    _checkClickTipOpenFolderMenuItem.Enabled = false;
-                    _checkClickTipOpenFileMenuItem.Enabled = false;
-                    _checkRemoveAeroMenuItem.Enabled = false;
-                    _checkNotSaveMenuItem.Enabled = false;
-                    _checkTryProtectMenuItem.Enabled = false;
-                    _checkComMsMenuItem.Enabled = false;
-                    this._notifyIcon.ShowBalloonTip(1000, $"YasoCut", $"启动连续截图", System.Windows.Forms.ToolTipIcon.Info);
-                    _backThread = new Thread(BackWorkThread)
-                    {
-                        Priority = ThreadPriority.Normal,
-                        IsBackground = true
-                    };
-                    _backThread.Start();
-                    //_backThread2 = new Thread(SaveImageConCore)
-                    //{
-                    //    Priority = ThreadPriority.Highest,
-                    //    IsBackground = true
-                    //};
-
-                    //_backThread2.Start();
-                }
+                SwitchConOrOb(BackWorkThreadCon, "连续");
+            }
+            else if (_checkObModeMenuItem.Checked)
+            {
+                SwitchConOrOb(BackWorkThreadOB, "爆发");
             }
             else
             {
@@ -848,7 +1105,7 @@ namespace YasoCut
             }
             catch (Exception ex)
             {
-                this._notifyIcon.ShowBalloonTip(1000, $"截图失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                ShowTips($"截图失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
                 if (bmp != null)
                 {
                     bmp.Dispose();
@@ -871,7 +1128,7 @@ namespace YasoCut
                 }
                 catch (Exception ex)
                 {
-                    this._notifyIcon.ShowBalloonTip(1000, $"截图到剪切板失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                    ShowTips($"截图到剪切板失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
                 }
             }
 
@@ -884,13 +1141,13 @@ namespace YasoCut
                     bmp.Save(_lastImgFile, format.GetImageFormat());
                     if (_checkShowTipMenuItem.Checked)
                     {
-                        this._notifyIcon.ShowBalloonTip(1000, "截图保存成功", $"{folder}\n{fileName}", System.Windows.Forms.ToolTipIcon.Info);
+                        ShowTips("截图保存成功", $"{folder}\n{fileName}", System.Windows.Forms.ToolTipIcon.Info);
                     }
                 }
                 catch (Exception ex)
                 {
                     _lastImgFile = null;
-                    this._notifyIcon.ShowBalloonTip(1000, $"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
+                    ShowTips($"截图保存失败", $"\n{ex}", System.Windows.Forms.ToolTipIcon.Error);
                 }
             }
             bmp.Dispose();
@@ -912,7 +1169,7 @@ namespace YasoCut
                     ButtonShotcut.IsEnabled = false;
                     return;
                 }
-                TextboxMs.IsEnabled = _checkComMsMenuItem.Checked;
+                TextboxMs.IsEnabled = true;
                 _isSettingShortCut = false;
                 TextboxShotcut.IsEnabled = false;
                 TextboxPrefix.IsEnabled = true;
@@ -921,7 +1178,11 @@ namespace YasoCut
                 ButtonSelect.IsEnabled = true;
                 CheckBoxTitle.IsEnabled = true;
                 ButtonShotcut.Content = "设置快捷键";
-                _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ? "YasoCut - 连续模式" : "YasoCut";
+                _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ?
+                    "YasoCut - 连续模式" :
+                    _checkObModeMenuItem.Checked ?
+                    "YasoCut - 爆发模式" :
+                    "YasoCut";
                 using (RegistryKey soft = Registry.CurrentUser.OpenSubKey("SOFTWARE", true))
                 {
                     long shortcut = ((long)(_modifierKeys) << 32)
@@ -999,7 +1260,7 @@ namespace YasoCut
                 TextboxShotcut.Text = $"{e.Key}";
             }
 
-           
+
         }
 
         private void ReadReg()
@@ -1071,6 +1332,13 @@ namespace YasoCut
                 }
                 TextboxMs.Text = comMs.ToString();
 
+                if (!(yasocut.GetValue("ObCount") is int obCount))
+                {
+                    obCount = 1;
+                    yasocut.SetValue("ObCount", obCount, RegistryValueKind.DWord);
+                }
+                TextboxOB.Text = obCount.ToString();
+
 
                 if (!(yasocut.GetValue("ShowTip") is int showTip))
                 {
@@ -1135,7 +1403,11 @@ namespace YasoCut
                     {
                         TextboxShotcut.Text = $"{KeyInterop.KeyFromVirtualKey(_vkey)}";
                     }
-                    _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ? "YasoCut - 连续模式" : "YasoCut";
+                    _notifyIcon.Text = WindowTitle.Title = _checkComMsMenuItem.Checked ?
+                          "YasoCut - 连续模式" :
+                          _checkObModeMenuItem.Checked ?
+                          "YasoCut - 爆发模式" :
+                          "YasoCut";
                 }
                 else
                 {
@@ -1271,7 +1543,7 @@ namespace YasoCut
             return false;
         }
 
-        private void TextboxMs_PreviewKeyDown(object sender, KeyEventArgs e)
+        private void TextboxNumber_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             switch (e.Key)
             {
@@ -1312,31 +1584,42 @@ namespace YasoCut
         }
 
 
-        private bool _setTextboxMs = false;
+
         private void TextboxMs_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            NumberBoxChangedCore(TextboxMs, "ConMs");
+        }
+
+        private void TextboxOB_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            NumberBoxChangedCore(TextboxOB, "ObCount");
+        }
+
+        private bool _setTextbox = false;
+        private void NumberBoxChangedCore(TextBox textbox, string key)
         {
             if (!_inited)
             {
                 return;
             }
-            if (_setTextboxMs)
+            if (_setTextbox)
             {
                 return;
             }
-            _setTextboxMs = true;
-            string str = TextboxMs.Text;
+            _setTextbox = true;
+            string str = textbox.Text;
             if (string.IsNullOrWhiteSpace(str) || !int.TryParse(str, out int value) || value <= 0)
             {
-                TextboxMs.Text = string.Empty;
+                textbox.Text = string.Empty;
                 value = 1;
             }
             using (RegistryKey soft = Registry.CurrentUser.OpenSubKey("SOFTWARE", true))
             {
                 RegistryKey yasocut = soft.OpenSubKey("YasoCut", true) ?? soft.CreateSubKey("YasoCut", true);
-                yasocut.SetValue("ConMs", value, RegistryValueKind.DWord);
+                yasocut.SetValue(key, value, RegistryValueKind.DWord);
                 yasocut.Dispose();
             }
-            _setTextboxMs = false;
+            _setTextbox = false;
         }
     }
 }
