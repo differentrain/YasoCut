@@ -11,7 +11,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="auto"/>
             <ColumnDefinition/>
-            <ColumnDefinition Width="auto"/>
+            <ColumnDefinition Width="140"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition/>
@@ -19,6 +19,7 @@
             <RowDefinition/>
             <RowDefinition/>
             <RowDefinition/>
+            <RowDefinition Height="24"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="保存目录"/>
         <TextBox x:Name="TextboxPath" IsReadOnly="True" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
@@ -34,10 +35,30 @@
         <TextBox IsEnabled="False" PreviewKeyDown="TextboxShotcut_PreviewKeyDown" x:Name="TextboxShotcut" IsReadOnly="True" Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
         <Button Click="ButtonShotcut_Click" x:Name="ButtonShotcut" Content="设置快捷键" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center"/>
         <TextBlock  Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="连续间隔"/>
-        <TextBox   TextChanged="TextboxMs_TextChanged" PreviewKeyDown="TextboxNumber_PreviewKeyDown" x:Name="TextboxMs" Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
+        <TextBox   TextChanged="TextboxMs_TextChanged"  InputMethod.IsInputMethodEnabled="False" PreviewKeyDown="TextboxNumber_PreviewKeyDown" x:Name="TextboxMs" Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
         <TextBlock Grid.Row="3" Grid.Column="2" VerticalAlignment="Center" Text="毫秒（1000毫秒=1秒）"/>
         <TextBlock  Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="爆发数量"/>
         <TextBox TextChanged="TextboxOB_TextChanged" PreviewKeyDown="TextboxNumber_PreviewKeyDown" x:Name="TextboxOB" Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0" />
-
+        <TextBlock  Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="图片缩放"/>
+        <Grid Grid.Row="5" Grid.Column="1" VerticalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="auto"/>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="auto"/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Margin="8,0,0,0" Text="宽度" Grid.Column="0"/>
+            <TextBox x:Name="TextWidth" TextChanged="TextWidth_TextChanged"  InputMethod.IsInputMethodEnabled="False" Text="800" Margin="4,0,4,0" Grid.Column="1"/>
+            <TextBlock Margin="0,0,0,0" Text="高度" Grid.Column="2"/>
+            <TextBox x:Name="TextHeight" TextChanged="TextHeight_TextChanged" Text="600"  InputMethod.IsInputMethodEnabled="False" Margin="4,0,8,0" Grid.Column="3"/>
+        </Grid>
+        <ComboBox x:Name="ComboBoxScale" SelectionChanged="ComboBoxScale_SelectionChanged" Grid.Row="5" Grid.Column="2" VerticalAlignment="Center" >
+            <ComboBoxItem  Content="不启用"/>
+            <ComboBoxItem  Content="高质量"/>
+            <ComboBoxItem  Content="低质量"/>
+            <ComboBoxItem  Content="最近邻插值法"/>
+            <ComboBoxItem  Content="高质量双线性插值法"/>
+            <ComboBoxItem  Content="高质量三次插值法"/>
+        </ComboBox>
     </Grid>
 </Window>

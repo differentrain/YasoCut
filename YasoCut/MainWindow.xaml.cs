@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
@@ -22,6 +23,8 @@ using System.Windows.Interop;
 
 using YasoCut.Internals;
 using YasoCut.PInvoke;
+
+using Point = System.Drawing.Point;
 
 
 
@@ -112,7 +115,7 @@ namespace YasoCut
                     SetIcon();
                 }
             }
-
+            ComboBoxScale.SelectedIndex = 0;
 
         }
 
@@ -696,6 +699,7 @@ namespace YasoCut
                 {
                     g?.Dispose();
                 }
+                bmp = TryResizeImage(bmp);
                 try
                 {
                     bmp.Save($"{folder}\\{prefix}{DateTime.Now:yyyyMMddHHmmssfff}_con.{extension}", formatR);
@@ -876,7 +880,7 @@ namespace YasoCut
                 {
                     g?.Dispose();
                 }
-
+                bmp = TryResizeImage(bmp);
                 try
                 {
                     bmp.Save($"{folder}\\{prefix}{DateTime.Now:yyyyMMddHHmmssfff}_ob.{extension}", formatR);
@@ -1004,7 +1008,7 @@ namespace YasoCut
                     IsBackground = true
                 };
                 _backThread.Start();
-              
+
             }
         }
 
@@ -1117,7 +1121,7 @@ namespace YasoCut
             {
                 g?.Dispose();
             }
-
+            bmp = TryResizeImage(bmp);
             var format = (ImageFormatType)_comboFormatMenuItem.SelectedIndex;
 
             if (notSave || _checkCopyMenuItem.Checked)
@@ -1620,6 +1624,90 @@ namespace YasoCut
                 yasocut.Dispose();
             }
             _setTextbox = false;
+        }
+
+        private InterpolationMode? _interpolationMode = null;
+        private void ComboBoxScale_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            switch (ComboBoxScale.SelectedIndex)
+            {
+                case 1:
+                    _interpolationMode = InterpolationMode.High;
+                    break;
+                case 2:
+                    _interpolationMode = InterpolationMode.Low;
+                    break;
+                case 3:
+                    _interpolationMode = InterpolationMode.NearestNeighbor;
+                    break;
+                case 4:
+                    _interpolationMode = InterpolationMode.HighQualityBilinear;
+                    break;
+                case 5:
+                    _interpolationMode = InterpolationMode.HighQualityBicubic;
+                    break;
+                default:
+                    _interpolationMode = null;
+                    break;
+            }
+
+            TextWidth.IsEnabled = TextHeight.IsEnabled = ComboBoxScale.SelectedIndex != 0;
+        }
+
+        private int _scaleW = 800;
+        private void TextWidth_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _scaleW = TextWHChangedCore(TextWidth, 800);
+
+        }
+        private int _scaleH = 800;
+        private void TextHeight_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _scaleH = TextWHChangedCore(TextHeight, 600);
+        }
+
+        private Bitmap TryResizeImage(Bitmap image)
+        {
+            if (_interpolationMode == null) return image;
+            try
+            {
+                return ResizeImageWithMatrix(image, _interpolationMode.Value, _scaleW, _scaleH);
+            }
+            catch
+            {
+                return image;
+            }
+        }
+
+
+        private static Bitmap ResizeImageWithMatrix(Bitmap image, InterpolationMode im, int width, int height)
+        {
+            Bitmap b = new Bitmap(width, height);
+            using (Graphics g = Graphics.FromImage(b))
+            {
+
+                g.InterpolationMode = im;
+                g.Transform = new Matrix((float)width / image.Width, 0, 0, (float)height / image.Height, 0, 0);
+                g.DrawImage(image, new Point(0, 0));
+            }
+            return b;
+        }
+
+        private int TextWHChangedCore(TextBox textbox, int defaultValue)
+        {
+            if (_setTextbox)
+            {
+                return int.Parse(textbox.Text);
+            }
+            _setTextbox = true;
+            string str = textbox.Text;
+            if (string.IsNullOrWhiteSpace(str) || !int.TryParse(str, out int value) || value <= 0 || value >= 10000)
+            {
+                textbox.Text = defaultValue.ToString();
+                value = defaultValue;
+            }
+            _setTextbox = false;
+            return value;
         }
     }
 }
