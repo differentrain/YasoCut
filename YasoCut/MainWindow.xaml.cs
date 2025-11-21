@@ -1669,6 +1669,10 @@ namespace YasoCut
         private Bitmap TryResizeImage(Bitmap image)
         {
             if (_interpolationMode == null) return image;
+            if (image.Size.Width== _scaleW && image.Size.Height==_scaleH)
+            {
+                return image;
+            }
             try
             {
                 return ResizeImageWithMatrix(image, _interpolationMode.Value, _scaleW, _scaleH);
